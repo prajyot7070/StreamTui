@@ -1,0 +1,115 @@
+Roadmap: Terminal-based WebRTC Live Streaming Server (TUI)
+Phase 1: Setting Up the WebSocket Signaling Server
+
+    Goal:
+        Set up a WebSocket server to handle WebRTC signaling (SDP offers, ICE candidates) for connecting two peers.
+
+    Steps:
+
+        Install Java WebSocket Library:
+            Use a simple library like Java-WebSocket to set up a signaling server.
+            Java-WebSocket is lightweight and works well for this.
+
+        Implement Signaling Server:
+            Write a WebSocket server in Java that:
+                Allows users to log in.
+                Supports room creation (assigns room IDs).
+                Supports room joining based on room ID.
+                Handles WebRTC signaling messages (SDP offers/answers, ICE candidates).
+
+        Testing:
+            Set up a basic echo server using WebSockets to ensure the server can handle communication between two clients.
+
+        Enhance Server for Room Management:
+            Add support for creating and managing rooms.
+            Store users and rooms in memory for simplicity.
+            Ensure that messages are forwarded to the correct room and user.
+
+    Deliverable:
+        A working WebSocket server that can create/join rooms and relay signaling messages.
+
+Phase 2: Implement WebRTC in Java
+
+    Goal:
+        Use WebRTC for peer-to-peer video streaming between terminal clients.
+
+    Steps:
+
+        Install WebRTC Library:
+            Use the Java WebRTC bindings from projects like IceLink or webrtc-java. These libraries allow you to use WebRTC in non-browser applications.
+
+        Set Up Video Capture:
+            Use JavaCV (a wrapper for OpenCV) to capture video from the user’s webcam.
+
+        Establish WebRTC Peer Connection:
+            Write Java code that connects two clients using WebRTC, exchanging signaling data through the WebSocket server.
+            Ensure that once two clients connect, the video stream from one client is sent to the other.
+
+        Testing:
+            First, get a basic connection working between two peers.
+            Use any static video (or dummy frames) to ensure video data can be transmitted between clients.
+
+    Deliverable:
+        A basic WebRTC connection between two terminal clients with video data being transmitted.
+
+Phase 3: Building the TUI for Clients
+
+    Goal:
+        Create a terminal user interface where users can log in, create/join rooms, and initiate WebRTC streaming.
+
+    Steps:
+
+        Install Lanterna:
+            Use the Lanterna library to build a terminal user interface.
+
+        Implement Login and Room Management:
+            Set up a simple interface where users can:
+                Enter a username and password (for now, you can skip actual authentication or use a simple mock authentication).
+                Create a room or join a room using a room ID.
+
+        Connect TUI with WebSocket Server:
+            Once a user joins a room, the TUI client should establish a WebSocket connection with the signaling server to exchange WebRTC signaling messages.
+
+        Testing:
+            Test logging in, creating rooms, and joining rooms with multiple users.
+            Make sure the WebSocket connections are working, and signaling messages are being exchanged correctly.
+
+    Deliverable:
+        A TUI where users can log in, create rooms, and join rooms. Signaling messages are exchanged between clients.
+
+Phase 4: Video Rendering (Normal and ASCII)
+
+    Goal:
+        Capture video and render it in the terminal (normal video first, then try ASCII rendering if time allows).
+
+    Steps:
+        Render Normal Video:
+            Use JavaCV to capture video from the webcam and display it in the terminal.
+            For simplicity, you can render the video frame-by-frame as plain text (if rendering normal video directly in the terminal isn’t possible).
+        Render ASCII Video:
+            Convert video frames into ASCII characters.
+            You can find simple image-to-ASCII conversion algorithms in Java. Apply this to each video frame.
+            Display the ASCII video in the terminal using Lanterna.
+
+    Deliverable:
+        Normal video rendering working first.
+        If time allows, a basic ASCII video renderer for the captured frames.
+
+Phase 5: Final Testing and Optimization
+
+    Goal:
+        Ensure everything works together smoothly.
+
+    Steps:
+
+        Test the Entire Application:
+            Test logging in, room creation/joining, WebRTC connection, and video streaming between two clients.
+
+        Handle Edge Cases:
+            Handle situations like a user leaving the room, reconnecting, etc.
+
+        Optimize Performance:
+            If you encounter performance issues (especially with video rendering), consider reducing frame rates or resolution.
+
+    Deliverable:
+        A fully working live streaming application with TUI and WebRTC.

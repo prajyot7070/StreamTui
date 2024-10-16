@@ -61,7 +61,7 @@ public class WebRTCHandler {
             @Override
             public void onIceCandidate(RTCIceCandidate rtcIceCandidate) {
                 System.out.println("New ICE Candidate : " + rtcIceCandidate.toString());
-                sendIcetoSignaling(rtcIceCandidate);
+                sendToSignalingServer("ICE_CANDIDATE",rtcIceCandidate.toString());
             }
 
             @Override
@@ -93,8 +93,26 @@ public class WebRTCHandler {
                 }
 
                 @Override
-                public void onMessage(String s) {
-                    System.out.println("Message received: " + s);
+                public void onMessage(String message) {
+                    String[] parts = message.split(":", 2);
+                    String type = parts[0];
+                    String payload = parts[1];
+
+                    switch (type) {
+                        case "OFFER":
+                            handleRemoteSDPOffer(payload);
+                            break;
+                        case "ANSWER":
+                            handleRemoteSDPAnswer(payload);
+                            break;
+                        case "ICE_CANDIDATE":
+                            String[] iceCandidateParts = payload.split(";");
+                            RTCIceCandidate iceCandidate = new RTCIceCandidate(iceCandidateParts[0], Integer.parseInt(iceCandidateParts[1]), iceCandidateParts[2]);
+                            handleRemoteICECandidate(iceCandidate);
+                            break;
+                        default:
+                            System.err.println("Unknown message type: " + type);
+                    }
                 }
 
                 @Override
@@ -113,7 +131,28 @@ public class WebRTCHandler {
         }
     }
 
+    // TESTING CODE
+    public void login(String userId) {
+        sendToSignalingServer("LOGIN", userId);
+    }
 
+    public void createRoom(String roomId) {
+        sendToSignalingServer("CREATE_ROOM", roomId);
+    }
+
+    public void joinRoom(String roomId) {
+        sendToSignalingServer("JOIN_ROOM", roomId);
+    }
+
+    public void checkConnectionStatus() {
+        if (peerConnection != null) {
+            System.out.println("Connection state: " + peerConnection.getConnectionState());
+            System.out.println("ICE connection state: " + peerConnection.getIceConnectionState());
+            System.out.println("Signaling state: " + peerConnection.getSignalingState());
+        } else {
+            System.out.println("PeerConnection is null");
+        }
+    }
 
     //Create an SDP offer
     public void createOffer() {
@@ -125,7 +164,18 @@ public class WebRTCHandler {
             @Override
             public void onSuccess(RTCSessionDescription rtcSessionDescription) {
                 System.out.println("SDP offer created locally");
-                sendToSignalingServer(rtcSessionDescription);
+                peerConnection.setLocalDescription(rtcSessionDescription, new SetSessionDescriptionObserver() {
+                    @Override
+                    public void onSuccess() {
+                        System.out.println("OFFER | SDP created :" + rtcSessionDescription.sdp);
+                        sendToSignalingServer("OFFER", rtcSessionDescription.sdp);
+                    }
+
+                    @Override
+                    public void onFailure(String err) {
+                        System.err.println("Failed to set local SDP: " + err);
+                    }
+                });
             }
 
             @Override
@@ -145,7 +195,18 @@ public class WebRTCHandler {
             @Override
             public void onSuccess(RTCSessionDescription rtcSessionDescription) {
                 System.out.println("SDP answer created locally");
-                sendToSignalingServer(rtcSessionDescription);
+                peerConnection.setLocalDescription(rtcSessionDescription, new SetSessionDescriptionObserver() {
+                    @Override
+                    public void onSuccess() {
+                        System.out.println("ANSWER | SDP created :" + rtcSessionDescription.sdp);
+                        sendToSignalingServer("ANSWER", rtcSessionDescription.sdp);
+                    }
+
+                    @Override
+                    public void onFailure(String s) {
+                        System.err.println("Failed to set local SDP: " + s);
+                    }
+                });
             }
 
             @Override
@@ -155,49 +216,53 @@ public class WebRTCHandler {
         });
     }
 
-    //Set the remote SDP answer to the peerConnetion
-    public void handleRemoteSDPAnswer(String sdp, String type){
-        RTCSessionDescription remoteSDP = new RTCSessionDescription(
-                type.equals("offer") ? RTCSdpType.OFFER : RTCSdpType.ANSWER,
-                sdp
-        );
+    //Handle incoming SDP offer and create an answer
+    public void handleRemoteSDPOffer(String sdp){
+        RTCSessionDescription remoteSDP = new RTCSessionDescription(RTCSdpType.OFFER, sdp);
         peerConnection.setRemoteDescription(remoteSDP, new SetSessionDescriptionObserver(){
             @Override
             public void onSuccess() {
+                System.out.println("Recived SDP offer : " + remoteSDP.toString());
+                System.out.println("Remote SDP set successfully");
+                createAnswer();
+            }
+
+            @Override
+            public void onFailure(String err) {
+                System.out.println("Failed to set remote SDP answer : - " + remoteSDP.toString() + "\n Error : - " + err);
+            }
+        });
+    }
+
+    //Set the remote SDP answer to the peerConnetion
+    public void handleRemoteSDPAnswer(String sdp){
+        RTCSessionDescription remoteSDP = new RTCSessionDescription(RTCSdpType.ANSWER, sdp);
+        peerConnection.setRemoteDescription(remoteSDP, new SetSessionDescriptionObserver(){
+            @Override
+            public void onSuccess() {
+                System.out.println("Recived SDP answer : " + remoteSDP.toString());
                 System.out.println("Remote SDP set successfully");
             }
 
             @Override
-            public void onFailure(String s) {
-                System.out.println("Failed to set remote SDP: " + remoteSDP.toString());
+            public void onFailure(String err) {
+                System.out.println("Failed to set remote SDP answer : - " + remoteSDP.toString() + "\n Error : - " + err);
             }
         });
 
     }
 
-    //Add the ICE candidate received from the signaling server to the peer connection.
-    public void handleRemoteICECandidate(RTCIceCandidate remoteIceCandidate){
-        peerConnection.addIceCandidate(remoteIceCandidate);
+    //Set the remote ICE candidate
+    public void handleRemoteICECandidate(RTCIceCandidate iceCandidate){
+        RTCIceCandidate candidate = new RTCIceCandidate(iceCandidate.sdpMid, iceCandidate.sdpMLineIndex, iceCandidate.sdp);
+        System.out.println("Recieved ICE candidate :" + candidate.toString());
+        peerConnection.addIceCandidate(candidate);
     }
 
-    //Send SDP to Signaling server
-    private void sendToSignalingServer(RTCSessionDescription rtcSessionDescription) {
-        if (rtcSessionDescription == null || rtcSessionDescription.sdp == null) {
-            System.err.println("RTCSessionDescription or SDP is null");
-            return;
-        }
-        //logic to send the offer to Signaling server
+    // Send signaling messages (SDP or ICE candidates) to the signaling server
+    private void sendToSignalingServer(String type, String payload) {
         if (webSocketClient != null && webSocketClient.isOpen()) {
-            webSocketClient.send(rtcSessionDescription.sdp);
-        }
-        System.out.println("Sending Offer to signaling server: " + rtcSessionDescription.sdp);
-    }
-
-    //Send ICE to Signaling server
-    private void sendIcetoSignaling(RTCIceCandidate rtcIceCandidate) {
-        if (rtcIceCandidate != null) {
-            System.out.println("Sending ICE to signaling server: " + rtcIceCandidate.toString());
-            //logic to send ICE candidate to SignalingServer . . .
+            webSocketClient.send(type + ":" + payload);
         }
     }
 

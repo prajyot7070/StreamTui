@@ -6,7 +6,6 @@ package com.streamtui;
 // 1. Initialize WebRTC PeerConnection Factory
 //    - Create PeerConnectionFactory.
 //    - Set up RTCConfiguration (add STUN server).
-
 // 2. Create PeerConnection
 //    - Use the factory to create PeerConnection with observer callbacks.
 //    - Listen for ICE candidates and connection state changes.
@@ -30,8 +29,11 @@ package com.streamtui;
 //    - Ensure the signaling server facilitates proper communication between clients.
 
 import dev.onvoid.webrtc.*;
-import dev.onvoid.webrtc.RTCPeerConnection.*;
-import dev.onvoid.webrtc.media.MediaStream;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
+
+import java.net.URI;
+import java.net.URISyntaxException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,7 @@ public class WebRTCHandler {
     private PeerConnectionFactory factory;
     private RTCPeerConnection peerConnection;
     private RTCConfiguration rtcConfig;
+    private WebSocketClient webSocketClient;
 
     // Constructor
     public WebRTCHandler() {
@@ -58,6 +61,7 @@ public class WebRTCHandler {
             @Override
             public void onIceCandidate(RTCIceCandidate rtcIceCandidate) {
                 System.out.println("New ICE Candidate : " + rtcIceCandidate.toString());
+                sendIcetoSignaling(rtcIceCandidate);
             }
 
             @Override
@@ -79,6 +83,122 @@ public class WebRTCHandler {
             }
 
         });
+
+        try{
+            URI uri = new URI("ws://localhost:8887");
+            webSocketClient = new WebSocketClient(uri) {
+                @Override
+                public void onOpen(ServerHandshake serverHandshake) {
+                    System.out.println("Connection opened");
+                }
+
+                @Override
+                public void onMessage(String s) {
+                    System.out.println("Message received: " + s);
+                }
+
+                @Override
+                public void onClose(int i, String s, boolean b) {
+                    System.out.println("Connection closed");
+                }
+
+                @Override
+                public void onError(Exception e) {
+                    e.printStackTrace();
+                }
+            };
+            webSocketClient.connect();
+        } catch (URISyntaxException e){
+            e.printStackTrace();
+        }
+    }
+
+
+
+    //Create an SDP offer
+    public void createOffer() {
+        if (peerConnection == null) {
+            System.err.println("PeerConnection is null");
+            return;
+        }
+        peerConnection.createOffer(new RTCOfferOptions(),new CreateSessionDescriptionObserver() {
+            @Override
+            public void onSuccess(RTCSessionDescription rtcSessionDescription) {
+                System.out.println("SDP offer created locally");
+                sendToSignalingServer(rtcSessionDescription);
+            }
+
+            @Override
+            public void onFailure(String error) {
+                System.err.println("Failed to create the offer: " + error);
+            }
+        });
+    }
+
+    //Create an SDP answer
+    public void createAnswer() {
+        if (peerConnection == null) {
+            System.err.println("PeerConnection is null");
+            return;
+        }
+        peerConnection.createAnswer(new RTCAnswerOptions(),new CreateSessionDescriptionObserver() {
+            @Override
+            public void onSuccess(RTCSessionDescription rtcSessionDescription) {
+                System.out.println("SDP answer created locally");
+                sendToSignalingServer(rtcSessionDescription);
+            }
+
+            @Override
+            public void onFailure(String s) {
+                System.err.println("Failed to create the answer: " + s);
+            }
+        });
+    }
+
+    //Set the remote SDP answer to the peerConnetion
+    public void handleRemoteSDPAnswer(String sdp, String type){
+        RTCSessionDescription remoteSDP = new RTCSessionDescription(
+                type.equals("offer") ? RTCSdpType.OFFER : RTCSdpType.ANSWER,
+                sdp
+        );
+        peerConnection.setRemoteDescription(remoteSDP, new SetSessionDescriptionObserver(){
+            @Override
+            public void onSuccess() {
+                System.out.println("Remote SDP set successfully");
+            }
+
+            @Override
+            public void onFailure(String s) {
+                System.out.println("Failed to set remote SDP: " + remoteSDP.toString());
+            }
+        });
+
+    }
+
+    //Add the ICE candidate received from the signaling server to the peer connection.
+    public void handleRemoteICECandidate(RTCIceCandidate remoteIceCandidate){
+        peerConnection.addIceCandidate(remoteIceCandidate);
+    }
+
+    //Send SDP to Signaling server
+    private void sendToSignalingServer(RTCSessionDescription rtcSessionDescription) {
+        if (rtcSessionDescription == null || rtcSessionDescription.sdp == null) {
+            System.err.println("RTCSessionDescription or SDP is null");
+            return;
+        }
+        //logic to send the offer to Signaling server
+        if (webSocketClient != null && webSocketClient.isOpen()) {
+            webSocketClient.send(rtcSessionDescription.sdp);
+        }
+        System.out.println("Sending Offer to signaling server: " + rtcSessionDescription.sdp);
+    }
+
+    //Send ICE to Signaling server
+    private void sendIcetoSignaling(RTCIceCandidate rtcIceCandidate) {
+        if (rtcIceCandidate != null) {
+            System.out.println("Sending ICE to signaling server: " + rtcIceCandidate.toString());
+            //logic to send ICE candidate to SignalingServer . . .
+        }
     }
 
 }

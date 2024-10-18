@@ -35,29 +35,29 @@ plugins {
     id 'java'
     id 'application'
 }
-
-<<<<<<< HEAD
-=======
-application {
-    mainClassName = 'com.streamtui.WebRTCTest'
-}
+//
+//application {
+//    mainClassName = 'com.streamtui.WebRTCTest'
+//}
 
 group = 'org.example'
 version = '1.0-SNAPSHOT'
 
->>>>>>> 4cb11bc (Your commit message)
+
+
+
 repositories {
     mavenCentral()
 }
 
 dependencies {
-<<<<<<< HEAD
+
     implementation 'org.java-websocket:Java-WebSocket:1.5.3'
     implementation 'com.googlecode.lanterna:lanterna:3.1.1'
     implementation 'org.bytedeco:javacv-platform:1.5.7'
     implementation 'org.slf4j:slf4j-simple:2.0.7'
     implementation 'com.google.code.gson:gson:2.10.1'
-=======
+
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     implementation 'org.java-websocket:Java-WebSocket:1.5.2'
@@ -66,7 +66,6 @@ dependencies {
     implementation "dev.onvoid.webrtc:webrtc-java:0.8.0"
     implementation group: "dev.onvoid.webrtc", name: "webrtc-java", version: "0.8.0", classifier: "windows-x86_64"
     implementation 'org.slf4j:slf4j-log4j12:1.7.29'
->>>>>>> 4cb11bc (Your commit message)
 }
 
 application {

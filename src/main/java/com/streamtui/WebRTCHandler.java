@@ -296,17 +296,6 @@ public class WebRTCHandler {
             webSocketClient.send(type + ":" + payload);
         }
     }
-//    public void initiateConnection() {
-//        System.out.println("Initiating WebRTC connection...");
-//        if (peerConnection == null) {
-//            System.err.println("PeerConnection is null. Cannot initiate connection.");
-//            return;
-//        }
-//        if (webSocketClient == null || !webSocketClient.isOpen()) {
-//            System.err.println("WebSocket is not open. Cannot initiate connection.");
-//            return;
-//        }
-//        createOffer();
-//    }
+
 
 }

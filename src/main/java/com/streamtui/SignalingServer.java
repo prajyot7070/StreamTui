@@ -323,8 +323,6 @@ public class SignalingServer extends WebSocketServer {
     }
 
     private void handleSignalingMessage(WebSocket sender, String type, String payload) {
-
-
         String senderId = socketToUser.get(sender);
         if (senderId == null) {
             sender.send("ERROR:Not logged in");
@@ -337,12 +335,18 @@ public class SignalingServer extends WebSocketServer {
             return;
         }
 
+        // Check if there is someone else in the room other than the sender
+        Set<String> roomMembers = roomUsers.get(roomId);
+        if (roomMembers == null || roomMembers.size() <= 1) {
+            sender.send("ERROR:No other participants in the room");
+            System.out.println("No participants other than the sender in the room. Offer not sent.");
+            return;
+        }
 
         notifyRoom(roomId, type, payload, senderId);
         System.out.println("Forwarding " + type + " message from " + senderId + " to room " + roomId);
-
-
     }
+
 
     private void notifyRoom(String roomId, String type, String payload) {
         notifyRoom(roomId, type, payload, null);
@@ -351,17 +355,29 @@ public class SignalingServer extends WebSocketServer {
     private void notifyRoom(String roomId, String type, String payload, String excludeUserId) {
         Set<String> roomMembers = roomUsers.get(roomId);
         if (roomMembers != null) {
+            boolean offerSent = false; // Flag to track if the offer is sent
             for (String userId : roomMembers) {
+                // Send to everyone except the user who created/sent the offer (excludeUserId)
                 if (excludeUserId == null || !userId.equals(excludeUserId)) {
                     WebSocket userConn = users.get(userId);
                     if (userConn != null && userConn.isOpen()) {
                         userConn.send(type + ":" + payload);
                         System.out.println("Sent " + type + " to user: " + userId);
+                        offerSent = true;
                     }
+                }
+            }
+
+            // If no offer was sent, notify the sender
+            if (!offerSent) {
+                WebSocket senderConn = users.get(excludeUserId);
+                if (senderConn != null && senderConn.isOpen()) {
+                    senderConn.send("ERROR:No participants to send the offer to.");
                 }
             }
         }
     }
+
 
     @Override
     public void onError(WebSocket conn, Exception ex) {

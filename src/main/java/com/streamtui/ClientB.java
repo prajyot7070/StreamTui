@@ -12,13 +12,19 @@ public class ClientB {
 
             System.out.println("Joining room...");
             clientB.joinRoom("testRoom");
+            Thread.sleep(2000);
+
+            System.out.println("Setting up local media...");
+            clientB.setupLocalMedia();
             Thread.sleep(1000);
 
             // Check connection status after joining
             clientB.checkConnectionStatus();
 
             // Keep the main thread alive to observe the connection
-            Thread.sleep(10000);
+            while (true) {
+                Thread.sleep(1000);
+            }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

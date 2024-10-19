@@ -12,13 +12,19 @@ public class ClientA {
 
             System.out.println("Creating room...");
             clientA.createRoom("testRoom");
-            Thread.sleep(6000);
+            Thread.sleep(2000);
+
+            System.out.println("Setting up local media...");
+            clientA.setupLocalMedia();
+            Thread.sleep(1000);
 
             // Check connection status after room creation
             clientA.checkConnectionStatus();
-            clientA.createOffer();
+
             // Keep the main thread alive to observe the connection
-            Thread.sleep(10000);
+            while (true) {
+                Thread.sleep(1000);
+            }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

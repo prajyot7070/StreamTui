@@ -29,6 +29,12 @@ package com.streamtui;
 //    - Ensure the signaling server facilitates proper communication between clients.
 
 import dev.onvoid.webrtc.*;
+import dev.onvoid.webrtc.media.MediaStream;
+import dev.onvoid.webrtc.media.MediaStreamTrack;
+import dev.onvoid.webrtc.media.video.VideoCapture;
+import dev.onvoid.webrtc.media.video.VideoCaptureCapability;
+import dev.onvoid.webrtc.media.video.VideoDevice;
+import dev.onvoid.webrtc.media.video.VideoDeviceSource;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -43,23 +49,40 @@ public class WebRTCHandler {
     private RTCPeerConnection peerConnection;
     private RTCConfiguration rtcConfig;
     private WebSocketClient webSocketClient;
+    private MediaStreamTrack mediaStreamTrack;
+    private VideoDeviceSource videoDeviceSource;
 
+    //Subclasss that extends the  VideoDevice and provides a public constructor
+    public class CustomVideoDevice extends VideoDevice {
+        public CustomVideoDevice(String name, String id) {
+            super(name, id);
+        }
+    }
+
+    public class CustomVideoCaptureCapability extends VideoCaptureCapability {
+        public CustomVideoCaptureCapability(int fps, int height, int width) {
+            super(fps, height, width);
+        }
+    }
+
+    // Constructor
     // Constructor
     public WebRTCHandler() {
         factory = new PeerConnectionFactory();
         rtcConfig = new RTCConfiguration();
         List<RTCIceServer> iceServers = new ArrayList<>();
-        //Adding public STUN server
         RTCIceServer stunServer = new RTCIceServer();
         stunServer.urls = List.of("stun:stun.l.google.com:19302");
         iceServers.add(stunServer);
-
         rtcConfig.iceServers = iceServers;
 
-        //Create a peer connection
+        initializePeerConnection();
+        setupWebSocket();
+    }
+
+    private void initializePeerConnection() {
         peerConnection = factory.createPeerConnection(rtcConfig, new PeerConnectionObserver() {
             @Override
-
             public void onIceCandidate(RTCIceCandidate rtcIceCandidate) {
                 System.out.println("New ICE Candidate: " + rtcIceCandidate.toString());
                 String iceCandidateMessage = String.format("%s;%s;%d",
@@ -67,77 +90,40 @@ public class WebRTCHandler {
                 sendToSignalingServer("ICE_CANDIDATE", iceCandidateMessage);
             }
 
-
-
             @Override
             public void onConnectionChange(RTCPeerConnectionState state) {
-                PeerConnectionObserver.super.onConnectionChange(state);
                 System.out.println("Connection state changed to: " + state);
             }
 
             @Override
             public void onIceConnectionChange(RTCIceConnectionState state) {
-                PeerConnectionObserver.super.onIceConnectionChange(state);
                 System.out.println("ICE connection state changed to: " + state);
             }
 
             @Override
             public void onSignalingChange(RTCSignalingState state) {
-                PeerConnectionObserver.super.onSignalingChange(state);
                 System.out.println("Signaling state changed to: " + state);
             }
-
         });
+    }
 
-        try{
+    private void setupWebSocket() {
+        try {
             URI uri = new URI("ws://localhost:8887");
             webSocketClient = new WebSocketClient(uri) {
                 @Override
                 public void onOpen(ServerHandshake serverHandshake) {
-                    System.out.println("Connection opened");
+                    System.out.println("WebSocket connection opened");
                 }
 
                 @Override
                 public void onMessage(String message) {
-                    String[] parts = message.split(":", 2);
-                    String type = parts[0];
-                    String payload = parts[1];
-
-                    switch (type) {
-
-                        case "LOGIN_SUCCESS":
-                            System.out.println("Logged in successfully as: " + payload);
-                            break;
-                        case "ROOM_JOINED":
-                            System.out.println("Room joined: " + payload);
-                            break;
-                        case "USER_JOINED":
-                            System.out.println("User joined: " + payload);
-                            break;
-                        case "ROOM_CREATED": // Add this case to handle ROOM_CREATED messages
-                            System.out.println("Room created: " + payload);
-                            break;
-                        case "OFFER":
-                            handleRemoteSDPOffer(payload);
-                            break;
-                        case "ANSWER":
-                            handleRemoteSDPAnswer(payload);
-                            break;
-                        case "ICE_CANDIDATE":
-                            String[] iceCandidateParts = payload.split(";");
-                            RTCIceCandidate iceCandidate = new RTCIceCandidate(iceCandidateParts[0],
-                                    Integer.parseInt(iceCandidateParts[1]), iceCandidateParts[2]);
-                            handleRemoteICECandidate(iceCandidate);
-                            break;
-
-                        default:
-                            System.err.println("Unknown message type: " + type);
-                    }
+                    handleSignalingMessage(message);
                 }
 
                 @Override
                 public void onClose(int i, String s, boolean b) {
-                    System.out.println("Connection closed");
+                    System.out.println("WebSocket connection closed");
                 }
 
                 @Override
@@ -146,8 +132,59 @@ public class WebRTCHandler {
                 }
             };
             webSocketClient.connect();
-        } catch (URISyntaxException e){
+        } catch (URISyntaxException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void setupLocalMedia() {
+
+        videoDeviceSource = new VideoDeviceSource();
+        CustomVideoDevice videoDevice = new CustomVideoDevice("UVC Camera (046d:0825)", "/dev/video0");
+        VideoCaptureCapability capability = new VideoCaptureCapability(640, 480, 30);
+        videoDeviceSource.setVideoCaptureDevice(videoDevice);
+        videoDeviceSource.setVideoCaptureCapability(capability);
+
+        mediaStreamTrack = factory.createVideoTrack("video_track", videoDeviceSource);
+
+        peerConnection.addTrack(mediaStreamTrack, List.of(mediaStreamTrack.getId()));
+        System.out.println("Local media setup completed");
+    }
+
+    private void handleSignalingMessage(String message) {
+        String[] parts = message.split(":", 2);
+        String type = parts[0];
+        String payload = parts[1];
+
+        switch (type) {
+            case "LOGIN_SUCCESS":
+                System.out.println("Logged in successfully as: " + payload);
+                break;
+            case "ROOM_JOINED":
+            case "ROOM_CREATED":
+                System.out.println(type + ": " + payload);
+                break;
+            case "USER_JOINED":
+                System.out.println("User joined: " + payload);
+                createOffer(); // Automatically create an offer when a new user joins
+                break;
+            case "OFFER":
+                handleRemoteSDPOffer(payload);
+                break;
+            case "ANSWER":
+                handleRemoteSDPAnswer(payload);
+                break;
+            case "ICE_CANDIDATE":
+                String[] iceCandidateParts = payload.split(";");
+                RTCIceCandidate iceCandidate = new RTCIceCandidate(
+                        iceCandidateParts[1],
+                        Integer.parseInt(iceCandidateParts[2]),
+                        iceCandidateParts[0]
+                );
+                handleRemoteICECandidate(iceCandidate);
+                break;
+            default:
+                System.err.println("Unknown message type: " + type);
         }
     }
 

@@ -15,16 +15,18 @@ public class ClientB {
             Thread.sleep(2000);
 
             System.out.println("Setting up local media...");
-            clientB.setupLocalMedia();
-            Thread.sleep(1000);
+//            clientB.setupLocalMedia();
+            Thread.sleep(10000);
 
             // Check connection status after joining
             clientB.checkConnectionStatus();
-
+//            clientB.stopLocalMedia();
             // Keep the main thread alive to observe the connection
             while (true) {
                 Thread.sleep(1000);
             }
+
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

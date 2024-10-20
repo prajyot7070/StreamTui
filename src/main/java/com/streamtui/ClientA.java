@@ -2,6 +2,7 @@ package com.streamtui;
 
 public class ClientA {
     public static void main(String[] args) {
+
         try {
             WebRTCHandler clientA = new WebRTCHandler();
             Thread.sleep(1000); // Wait for WebSocket connection
@@ -16,10 +17,11 @@ public class ClientA {
 
             System.out.println("Setting up local media...");
             clientA.setupLocalMedia();
-            Thread.sleep(1000);
+            Thread.sleep(10000);
 
             // Check connection status after room creation
             clientA.checkConnectionStatus();
+//            clientA.stopLocalMedia();
 
             // Keep the main thread alive to observe the connection
             while (true) {

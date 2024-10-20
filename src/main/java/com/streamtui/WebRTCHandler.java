@@ -29,14 +29,25 @@ package com.streamtui;
 //    - Ensure the signaling server facilitates proper communication between clients.
 
 import dev.onvoid.webrtc.*;
-import dev.onvoid.webrtc.media.MediaStream;
 import dev.onvoid.webrtc.media.MediaStreamTrack;
-import dev.onvoid.webrtc.media.video.VideoCapture;
-import dev.onvoid.webrtc.media.video.VideoCaptureCapability;
-import dev.onvoid.webrtc.media.video.VideoDevice;
-import dev.onvoid.webrtc.media.video.VideoDeviceSource;
+import dev.onvoid.webrtc.media.video.*;
+import javafx.application.Platform;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
+
+import java.awt.image.BufferedImage;
+import java.awt.Graphics;
+
+import javax.swing.JPanel;
+import javafx.scene.Scene;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
+import javafx.stage.Stage;
+import javafx.embed.swing.JFXPanel;
+import javafx.scene.layout.StackPane;
+
+
+import java.nio.ByteBuffer;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -50,7 +61,12 @@ public class WebRTCHandler {
     private RTCConfiguration rtcConfig;
     private WebSocketClient webSocketClient;
     private MediaStreamTrack mediaStreamTrack;
+    private VideoCapture videoCapture;
     private VideoDeviceSource videoDeviceSource;
+    private ImageView imageView;
+    private WritableImage writableImage;
+    private Stage stage;
+
 
     //Subclasss that extends the  VideoDevice and provides a public constructor
     public class CustomVideoDevice extends VideoDevice {
@@ -104,6 +120,17 @@ public class WebRTCHandler {
             public void onSignalingChange(RTCSignalingState state) {
                 System.out.println("Signaling state changed to: " + state);
             }
+
+            @Override
+            public void onTrack(RTCRtpTransceiver transceiver) {
+                if (transceiver.getReceiver().getTrack() instanceof VideoTrack) {
+                    VideoTrack remoteVideoTrack = (VideoTrack) transceiver.getReceiver().getTrack();
+                    System.out.println("Received remote video track on Client B.");
+
+                    // Display the remote video on Client B
+                    handleRemoteVideo(remoteVideoTrack);
+                }
+            }
         });
     }
 
@@ -134,6 +161,7 @@ public class WebRTCHandler {
             webSocketClient.connect();
         } catch (URISyntaxException e) {
             e.printStackTrace();
+            e.printStackTrace();
         }
     }
 
@@ -142,13 +170,31 @@ public class WebRTCHandler {
         videoDeviceSource = new VideoDeviceSource();
         CustomVideoDevice videoDevice = new CustomVideoDevice("UVC Camera (046d:0825)", "/dev/video0");
         VideoCaptureCapability capability = new VideoCaptureCapability(640, 480, 30);
+
+        videoCapture = new VideoCapture();
+        videoCapture.setVideoCaptureDevice(videoDevice);
+        videoCapture.setVideoCaptureCapability(capability);
+
+
         videoDeviceSource.setVideoCaptureDevice(videoDevice);
         videoDeviceSource.setVideoCaptureCapability(capability);
 
         mediaStreamTrack = factory.createVideoTrack("video_track", videoDeviceSource);
 
         peerConnection.addTrack(mediaStreamTrack, List.of(mediaStreamTrack.getId()));
+
+        try{videoDeviceSource.start();}catch(Exception e){e.getMessage();}
+
+
         System.out.println("Local media setup completed");
+    }
+
+    public void stopLocalMedia() {
+        if(videoDeviceSource != null){
+            videoDeviceSource.stop();
+            System.out.println("Local media stopped");
+            videoDeviceSource.dispose();
+        }
     }
 
     private void handleSignalingMessage(String message) {
@@ -316,11 +362,13 @@ public class WebRTCHandler {
 
     }
 
+
     //Set the remote ICE candidate
     public void handleRemoteICECandidate(RTCIceCandidate iceCandidate) {
         if (iceCandidate != null) {
             System.out.println("Received ICE candidate: " + iceCandidate.toString());
             peerConnection.addIceCandidate(iceCandidate);
+
         } else {
             System.out.println("ICE candidate is null");
         }
@@ -334,5 +382,48 @@ public class WebRTCHandler {
         }
     }
 
+    public void handleRemoteVideo(VideoTrack remoteVideoTrack) {
+        if (remoteVideoTrack == null) {
+            System.err.println("Remote video track is null");
+            return;
+        }
+
+        remoteVideoTrack.addSink(new VideoTrackSink() {
+            @Override
+            public void onVideoFrame(VideoFrame frame) {
+                try {
+                    VideoFrameBuffer buffer = frame.buffer;
+                    int width = buffer.getWidth();
+                    int height = buffer.getHeight();
+                    System.out.println("Received frame: " + width + "x" + height);
+
+                    // Print additional frame information
+                    System.out.println("Frame rotation: " + frame.rotation);
+                    System.out.println("Frame timestamp: " + frame.timestampNs);
+
+                    // Check buffer type
+                    if (buffer instanceof I420Buffer) {
+                        System.out.println("Buffer type: I420");
+                        // You can add more specific I420 buffer handling here if needed
+                    } else {
+                        System.out.println("Buffer type: " + buffer.getClass().getSimpleName());
+                    }
+
+                    // Don't try to access or process buffer data yet
+                } catch (Exception e) {
+                    System.err.println("Error processing video frame: " + e.getMessage());
+                    e.printStackTrace();
+                } finally {
+                    // Ensure buffer is always released
+                    if (frame.buffer != null) {
+                        frame.buffer.release();
+                    }
+                }
+            }
+        });
+
+        System.out.println("Remote video handler set up");
+    }
 
 }
+

@@ -34,6 +34,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
 }
 //
 //application {
@@ -67,8 +68,14 @@ dependencies {
     implementation group: "dev.onvoid.webrtc", name: "webrtc-java", version: "0.8.0", classifier: "linux-x86_64"
     implementation group: "dev.onvoid.webrtc", name: "webrtc-java", version: "0.8.0", classifier: "windows-x86_64"
     implementation 'org.slf4j:slf4j-log4j12:1.7.29'
+//    implementation 'org.openjfx:javafx-controls:16'
+//    implementation 'org.openjfx:javafx-fxml:16'
 }
 
 application {
     mainClass = 'com.streamtui.Main'
 }
+
+javafx {
+    version = "21"
+    modules = [ 'javafx.controls', 'javafx.fxml', 'javafx.swing', 'javafx.media', 'javafx.graphics']}

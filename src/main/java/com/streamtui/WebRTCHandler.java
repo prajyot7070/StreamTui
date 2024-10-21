@@ -29,6 +29,7 @@ package com.streamtui;
 //    - Ensure the signaling server facilitates proper communication between clients.
 
 import dev.onvoid.webrtc.*;
+import dev.onvoid.webrtc.media.FourCC;
 import dev.onvoid.webrtc.media.MediaStreamTrack;
 import dev.onvoid.webrtc.media.video.*;
 import javafx.application.Platform;
@@ -38,7 +39,8 @@ import org.java_websocket.handshake.ServerHandshake;
 import java.awt.image.BufferedImage;
 import java.awt.Graphics;
 
-import javax.swing.JPanel;
+import javax.swing.*;
+
 import javafx.scene.Scene;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
@@ -47,6 +49,8 @@ import javafx.embed.swing.JFXPanel;
 import javafx.scene.layout.StackPane;
 
 
+import java.awt.image.DataBufferByte;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 import java.net.URI;
@@ -66,6 +70,7 @@ public class WebRTCHandler {
     private ImageView imageView;
     private WritableImage writableImage;
     private Stage stage;
+//    private VideoPlayer videoPlayer;
 
 
     //Subclasss that extends the  VideoDevice and provides a public constructor
@@ -94,6 +99,7 @@ public class WebRTCHandler {
 
         initializePeerConnection();
         setupWebSocket();
+
     }
 
     private void initializePeerConnection() {
@@ -126,8 +132,8 @@ public class WebRTCHandler {
                 if (transceiver.getReceiver().getTrack() instanceof VideoTrack) {
                     VideoTrack remoteVideoTrack = (VideoTrack) transceiver.getReceiver().getTrack();
                     System.out.println("Received remote video track on Client B.");
-
                     // Display the remote video on Client B
+
                     handleRemoteVideo(remoteVideoTrack);
                 }
             }
@@ -169,7 +175,7 @@ public class WebRTCHandler {
 
         videoDeviceSource = new VideoDeviceSource();
         CustomVideoDevice videoDevice = new CustomVideoDevice("UVC Camera (046d:0825)", "/dev/video0");
-        VideoCaptureCapability capability = new VideoCaptureCapability(640, 480, 30);
+        VideoCaptureCapability capability = new VideoCaptureCapability(1020, 720, 30);
 
         videoCapture = new VideoCapture();
         videoCapture.setVideoCaptureDevice(videoDevice);
@@ -387,43 +393,33 @@ public class WebRTCHandler {
             System.err.println("Remote video track is null");
             return;
         }
+// Sirf Ice candidates exchange hote , isse hataya toh frames process hote but window ni ara cuz videPlayer is null
+//        if (videoPlayer == null) {
+//            System.err.println("VideoPlayer is null");
+//            return;
+//        }
+        VideoPlayer videoPlayer = new VideoPlayer();
+        VideoPlayer.startVideoPlayer(videoPlayer);
+            remoteVideoTrack.addSink(new VideoTrackSink() {
+                final byte[] dst = new byte[1020 * 720 * 4];
 
-        remoteVideoTrack.addSink(new VideoTrackSink() {
-            @Override
-            public void onVideoFrame(VideoFrame frame) {
-                try {
-                    VideoFrameBuffer buffer = frame.buffer;
-                    int width = buffer.getWidth();
-                    int height = buffer.getHeight();
-                    System.out.println("Received frame: " + width + "x" + height);
+                @Override
+                public void onVideoFrame(VideoFrame frame) {
+                    System.out.println("Received video frame : " + frame.buffer.toString());
+                    try {
+                        VideoBufferConverter.convertFromI420(frame.buffer, dst, FourCC.ABGR);
+                        videoPlayer.updateFrame(dst, frame.buffer.getWidth(), frame.buffer.getHeight());
 
-                    // Print additional frame information
-                    System.out.println("Frame rotation: " + frame.rotation);
-                    System.out.println("Frame timestamp: " + frame.timestampNs);
-
-                    // Check buffer type
-                    if (buffer instanceof I420Buffer) {
-                        System.out.println("Buffer type: I420");
-                        // You can add more specific I420 buffer handling here if needed
-                    } else {
-                        System.out.println("Buffer type: " + buffer.getClass().getSimpleName());
-                    }
-
-                    // Don't try to access or process buffer data yet
-                } catch (Exception e) {
-                    System.err.println("Error processing video frame: " + e.getMessage());
-                    e.printStackTrace();
-                } finally {
-                    // Ensure buffer is always released
-                    if (frame.buffer != null) {
-                        frame.buffer.release();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
                 }
-            }
-        });
-
-        System.out.println("Remote video handler set up");
+            });
+            System.out.println("Remote video handler set up");
     }
 
 }
+
+
+
 

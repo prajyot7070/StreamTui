@@ -14,7 +14,6 @@ public class ClientB {
             clientB.joinRoom("testRoom");
             Thread.sleep(2000);
 
-            System.out.println("Setting up local media...");
 //            clientB.setupLocalMedia();
             Thread.sleep(10000);
 
